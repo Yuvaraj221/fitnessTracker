@@ -1,0 +1,31 @@
+{
+  "name": "@forge/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "sample:load": "tsx scripts/sample-data.ts load",
+    "sample:remove": "tsx scripts/sample-data.ts remove",
+    "bundle": "esbuild src/vercel.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/vercel.mjs --external:express --external:jszip --external:papaparse --external:zod --external:@vercel/blob --log-level=warning"
+  },
+  "dependencies": {
+    "@forge/shared": "*",
+    "@vercel/blob": "^2.9.0",
+    "express": "^5.3.0",
+    "jszip": "^3.10.1",
+    "papaparse": "^5.7.1",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.10.0",
+    "@types/papaparse": "^5.5.2",
+    "esbuild": "^0.28.2",
+    "typescript": "~5.9.3"
+  }
+}

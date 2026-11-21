@@ -1,0 +1,21 @@
+achievement_id,achievement_name,achievement_category,achievement_level,description,unlocked_date,xp_awarded
+first_workout,First Rep,Workouts,bronze,Complete your first workout.,2026-11-01,50
+first_meal,Fuel Logged,Nutrition,bronze,Log your first meal.,2026-11-01,25
+first_weigh_in,Baseline,Body,bronze,Record your first body measurement.,2026-11-01,25
+volume_10k,Ten Tonnes,Records,bronze,"Lift 10,000 kg of total volume.",2026-11-04,100
+week_balanced@2026-W45,Built to Recover,Weekly,bronze,Train 3–5 days in a week while keeping rest days for recovery.,2026-11-06,40
+protein_week@2026-W45,Protein Week,Weekly,bronze,Hit your protein target on 5 days in one week.,2026-11-06,50
+streak_7,Locked In,Consistency,bronze,Maintain a 7-day tracking streak.,2026-11-07,100
+week_four@2026-W45,Full Week,Weekly,silver,Train on 4 different days in one week.,2026-11-08,75
+calorie_week@2026-W45,Dialed In,Weekly,bronze,Land within ±10% of your calorie target on 5 days in one week.,2026-11-08,50
+first_pr,New Best,Records,bronze,Set your first personal record.,2026-11-08,50
+pr_5,Record Breaker,Records,silver,Set 5 personal records.,2026-11-11,200
+week_balanced@2026-W46,Built to Recover,Weekly,bronze,Train 3–5 days in a week while keeping rest days for recovery.,2026-11-13,40
+protein_week@2026-W46,Protein Week,Weekly,bronze,Hit your protein target on 5 days in one week.,2026-11-14,50
+calorie_week@2026-W46,Dialed In,Weekly,bronze,Land within ±10% of your calorie target on 5 days in one week.,2026-11-14,50
+week_four@2026-W46,Full Week,Weekly,silver,Train on 4 different days in one week.,2026-11-15,75
+workouts_10,Ten Down,Workouts,silver,Complete 10 workouts.,2026-11-16,150
+week_balanced@2026-W47,Built to Recover,Weekly,bronze,Train 3–5 days in a week while keeping rest days for recovery.,2026-11-20,40
+protein_week@2026-W47,Protein Week,Weekly,bronze,Hit your protein target on 5 days in one week.,2026-11-20,50
+calorie_week@2026-W47,Dialed In,Weekly,bronze,Land within ±10% of your calorie target on 5 days in one week.,2026-11-20,50
+month_twelve@2026-11,Monthly Grind,Monthly,gold,Train on 12 days in a calendar month.,2026-11-20,200

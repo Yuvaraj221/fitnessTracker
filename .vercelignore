@@ -1,0 +1,5 @@
+backups/*
+!backups/.gitkeep
+frontend/dist
+backend/dist
+**/node_modules

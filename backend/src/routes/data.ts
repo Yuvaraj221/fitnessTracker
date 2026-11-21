@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { TABLE_LIST, TABLES, type TableName } from '../csv/schema';
-import { readTable, tablePath, withWriteLock } from '../csv/store';
-import { DATA_DIR, BACKUP_DIR } from '../config';
+import { readRaw, readTable, withWriteLock } from '../csv/store';
+import { storage } from '../storage';
 import { notFound } from '../lib/errors';
 import { sendMutation } from '../lib/respond';
 import { createBackup, deleteBackup, exportZip, importZip, listBackups, restoreBackup } from '../services/backup';
@@ -13,7 +13,8 @@ dataRouter.get('/info', async (_req, res) => {
   const tables = await Promise.all(
     TABLE_LIST.map(async (t) => ({ name: t.name, file: t.file, rows: (await readTable(t.name)).length })),
   );
-  res.json({ data: { dataDir: DATA_DIR, backupDir: BACKUP_DIR, tables, sampleRows: await sampleRowCount() } });
+  const s = storage();
+  res.json({ data: { dataDir: s.location, storage: { kind: s.kind, persistent: s.persistent }, tables, sampleRows: await sampleRowCount() } });
 });
 
 dataRouter.get('/backups', async (_req, res) => {
@@ -46,7 +47,11 @@ dataRouter.get('/export', async (_req, res) => {
 dataRouter.get('/export/:table', async (req, res) => {
   const name = req.params.table.replace(/\.csv$/, '') as TableName;
   if (!(name in TABLES)) throw notFound('Data file');
-  res.download(tablePath(name), TABLES[name].file);
+  const text = await readRaw(name);
+  if (text == null) throw notFound('Data file');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${TABLES[name].file}"`);
+  res.send(text);
 });
 
 dataRouter.post('/import', express.raw({ type: () => true, limit: '25mb' }), async (req, res) => {

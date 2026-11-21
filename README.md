@@ -8,7 +8,7 @@ All data lives in plain **CSV files** in [`data/`](data/). There is no database,
 
 ## Quick start
 
-Requires **Node.js 20.11+** and npm.
+Requires **Node.js 20.11+** (22 recommended, see `.nvmrc`) and npm.
 
 ```bash
 npm install
@@ -43,7 +43,7 @@ Both actions take a backup first.
 | `npm run dev` | Start API + web app with hot reload |
 | `npm run build` | Production build of the web app (`frontend/dist`) |
 | `npm start` | Serve the API + production build (run `npm run build` first) at http://localhost:4173 |
-| `npm test` | API end-to-end tests: CRUD, CSV escaping, concurrent writes, backup/restore |
+| `npm test` | API end-to-end tests: CRUD, CSV escaping, concurrent writes, backup/restore, Vercel Blob storage, access key |
 | `npm run typecheck` | TypeScript checks for backend and frontend |
 | `npm run sample:load` / `sample:remove` | Manage demo data |
 
@@ -68,6 +68,43 @@ backups/                automatic + manual snapshots
 - **Units.** Values are stored in kg and cm. Switching to lbs or inches changes only the display.
 - **Privacy.** `data/` is committed to this repo so the project starts with its CSVs. If you don't want your personal logs in git, add `data/*.csv` to `.gitignore` once you've removed the sample data.
 
+## Deploying to Vercel
+
+FORGE deploys to Vercel as a static React app plus one serverless function for the API. Everything is configured in [`vercel.json`](vercel.json):
+
+| Setting | Value |
+|---|---|
+| Framework preset | Other (`"framework": null`) |
+| Install command | `npm install && npm run bundle:api`. This bundles the Express API into `backend/dist/vercel.mjs` before functions are built. |
+| Build command | `npm run build` (Vite → `frontend/dist`) |
+| Output directory | `frontend/dist` |
+| API | `api/index.mjs` handles every `/api/*` request |
+| Routing | `/api/*` → function; every other path → `index.html` (client-side routing) |
+
+### Storage on Vercel
+
+Vercel functions can't write to the project folder, and anything written to `/tmp` is temporary and not shared between instances. FORGE picks storage automatically:
+
+| Where it runs | Storage | Persistent? |
+|---|---|---|
+| Your computer (`npm run dev`) | `data/*.csv` on disk | ✅ |
+| Vercel **with** a Blob store connected | The same CSV files, stored as private blobs under `forge/data/*.csv` (backups under `forge/backups/`) | ✅ |
+| Vercel **without** a Blob store | Temporary CSV copies in `/tmp`, seeded with sample data. The app shows a "Temporary storage" banner. | ❌ |
+
+The data stays plain CSV in every mode, and **Settings → Data → Export all (.zip)** works everywhere.
+
+### One-time setup (you do this in the Vercel dashboard)
+
+1. **Import the repo.** In Vercel, choose **Add New… → Project**, then import `Yuvaraj221/fitnessTracker`. Keep the root directory as `./`; `vercel.json` supplies every build setting.
+2. **Create a Blob store.** In the project, open **Storage → Create → Blob**, choose **Private** access, and connect it to all environments. Vercel adds `BLOB_READ_WRITE_TOKEN` automatically.
+3. **Set an access key.** Under **Settings → Environment Variables**, add `FORGE_ACCESS_KEY` with a long random value. Without it, anyone with the URL can read and change your data. You type the key once per device.
+4. **Redeploy** so the variables take effect.
+5. **Optional: bring your local data.** Locally, use **Settings → Data → Export all (.zip)**. On the deployed app, use **Import .zip**. Uploads are limited to about 4 MB on Vercel.
+
+Production deployments are built from your production branch, usually `main`. Pushes to other branches get preview URLs.
+
+All environment variables are listed in [`.env.example`](.env.example).
+
 ## Customising achievements
 
 Open `data/achievement_rules.csv` to change a threshold or XP value, disable a rule (`enabled=false`), or add a new row. Available metrics, periods and the level table are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#achievement-rules).
@@ -87,6 +124,10 @@ Optional environment variables:
 | `FORGE_DATA_DIR` | `./data` |
 | `FORGE_BACKUP_DIR` | `./backups` |
 | `FORGE_AUTO_BACKUP_RETENTION` | `40` |
+| `FORGE_ACCESS_KEY` | unset (no key required) |
+| `FORGE_STORAGE` | `blob` if `BLOB_READ_WRITE_TOKEN` is set, else `filesystem` |
+| `FORGE_BLOB_PREFIX` / `FORGE_BLOB_ACCESS` | `forge/` / `private` |
+| `FORGE_SEED_SAMPLE_DATA` | `true` on Vercel, `false` locally |
 
 ## Tech stack
 

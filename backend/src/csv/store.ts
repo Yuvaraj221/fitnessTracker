@@ -1,19 +1,18 @@
-// CSV persistence layer — the only code in FORGE that touches data files.
+// CSV persistence layer — the only code in FORGE that reads or writes data.
 //
 // Guarantees:
-//  * Reads always reflect the file on disk (cached by mtime + size), so edits
-//    made to the CSVs by hand are picked up without a restart.
+//  * Reads always reflect the stored file (cached by version), so edits made
+//    to the CSVs by hand are picked up without a restart.
 //  * Writes are serialised through one process-wide lock, so concurrent
 //    requests can never interleave and corrupt a file.
-//  * Each write goes to a temporary file that is fsync'd and then atomically
-//    renamed over the original. A multi-file transaction stages every temp
-//    file before renaming any of them.
+//  * Storage drivers stage writes before replacing anything: the filesystem
+//    driver writes fsync'd temp files and atomically renames them; the Vercel
+//    Blob driver uses ETags so a write never clobbers a newer version.
 //  * Columns found in a file that are not in the schema are preserved.
 
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import Papa from 'papaparse';
-import { DATA_DIR } from '../config';
+import { HttpError } from '../lib/errors';
+import { ConflictError, storage } from '../storage';
 import { TABLES, type ColumnType, type TableName } from './schema';
 
 export type Row = Record<string, unknown>;
@@ -21,13 +20,12 @@ export type Row = Record<string, unknown>;
 interface Snapshot {
   columns: string[];
   rows: Row[];
-  mtimeMs: number;
-  size: number;
+  version: string;
 }
 
 const cache = new Map<TableName, Snapshot>();
 
-export const tablePath = (name: TableName) => path.join(DATA_DIR, TABLES[name].file);
+export const tableKey = (name: TableName) => `data/${TABLES[name].file}`;
 
 // ------------------------------------------------------------------ coercion
 
@@ -58,7 +56,7 @@ function formatCell(v: unknown): string {
 
 export function parseCsv(name: TableName, text: string): { columns: string[]; rows: Row[] } {
   const schema = TABLES[name].columns;
-  const parsed = Papa.parse<Record<string, string>>(text.replace(/^﻿/, ''), {
+  const parsed = Papa.parse<Record<string, string>>(text.replace(/^\uFEFF/, ''), {
     header: true,
     skipEmptyLines: 'greedy',
     transformHeader: (h) => h.trim(),
@@ -84,44 +82,38 @@ export function serializeCsv(columns: string[], rows: Row[]): string {
 // ------------------------------------------------------------------ reads
 
 export async function readSnapshot(name: TableName): Promise<Snapshot> {
-  const file = tablePath(name);
-  const stat = await fs.stat(file);
   const hit = cache.get(name);
-  if (hit && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) return hit;
-  const text = await fs.readFile(file, 'utf8');
-  const { columns, rows } = parseCsv(name, text);
-  const snap = { columns, rows, mtimeMs: stat.mtimeMs, size: stat.size };
+  const res = await storage().read(tableKey(name), hit?.version);
+  if (!res) throw new HttpError(500, `${TABLES[name].file} is missing from storage. Restart FORGE to recreate it.`);
+  if (res.notModified && hit) return hit;
+  if (res.notModified) return readSnapshot(name);
+  const { columns, rows } = parseCsv(name, res.text);
+  const snap = { columns, rows, version: res.version };
   cache.set(name, snap);
   return snap;
 }
 
-/** Returns a deep-ish copy so callers can mutate freely. */
+/** Returns a copy of each row so callers can mutate freely. */
 export async function readTable<T = Row>(name: TableName): Promise<T[]> {
   const snap = await readSnapshot(name);
   return snap.rows.map((r) => ({ ...r })) as T[];
+}
+
+/** The raw CSV text of a table (for downloads and backups). */
+export async function readRaw(name: TableName): Promise<string | null> {
+  const res = await storage().read(tableKey(name));
+  return res && !res.notModified ? res.text : null;
 }
 
 // ------------------------------------------------------------------ writes
 
 let lock: Promise<unknown> = Promise.resolve();
 
-/** Runs `fn` exclusively: no other write can happen until it settles. */
+/** Runs `fn` exclusively: no other write in this process can happen until it settles. */
 export function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
   const run = lock.then(fn, fn);
   lock = run.catch(() => undefined);
   return run;
-}
-
-async function writeTemp(target: string, contents: string): Promise<string> {
-  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
-  const handle = await fs.open(tmp, 'w');
-  try {
-    await handle.writeFile(contents, 'utf8');
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-  return tmp;
 }
 
 export interface Transaction {
@@ -129,54 +121,54 @@ export interface Transaction {
   write(name: TableName, rows: Row[]): void;
 }
 
+const conflict = () =>
+  new HttpError(409, 'Your data was changed from another tab or device at the same moment. Nothing was overwritten — reload and try again.');
+
 /**
- * Read-modify-write across one or more tables under the global write lock.
+ * Read-modify-write across one or more tables under the write lock.
  * Staged writes are committed together when `fn` resolves; if `fn` throws,
  * nothing is written.
  */
 export function transaction<T>(fn: (tx: Transaction) => Promise<T>): Promise<T> {
   return withWriteLock(async () => {
     const staged = new Map<TableName, Row[]>();
+    const readVersions = new Map<TableName, Snapshot>();
     const tx: Transaction = {
       async read<R = Row>(name: TableName) {
         const s = staged.get(name);
         if (s) return s.map((r) => ({ ...r })) as R[];
-        return readTable<R>(name);
+        const snap = await readSnapshot(name);
+        if (!readVersions.has(name)) readVersions.set(name, snap);
+        return snap.rows.map((r) => ({ ...r })) as R[];
       },
       write(name, rows) {
         staged.set(name, rows);
       },
     };
     const result = await fn(tx);
-    await commit(staged);
+    if (staged.size) {
+      const ops = [];
+      for (const [name, rows] of staged) {
+        const snap = readVersions.get(name) ?? (await readSnapshot(name));
+        ops.push({ key: tableKey(name), text: serializeCsv(snap.columns, rows), ifMatch: readVersions.get(name)?.version });
+      }
+      try {
+        await storage().writeMany(ops);
+      } catch (err) {
+        if (err instanceof ConflictError) throw conflict();
+        throw err;
+      } finally {
+        for (const name of staged.keys()) cache.delete(name);
+      }
+    }
     return result;
   });
 }
 
-async function commit(staged: Map<TableName, Row[]>) {
-  const temps: { tmp: string; target: string; name: TableName }[] = [];
-  try {
-    for (const [name, rows] of staged) {
-      const snap = await readSnapshot(name);
-      const target = tablePath(name);
-      temps.push({ tmp: await writeTemp(target, serializeCsv(snap.columns, rows)), target, name });
-    }
-  } catch (err) {
-    await Promise.all(temps.map((t) => fs.rm(t.tmp, { force: true })));
-    throw err;
-  }
-  for (const t of temps) {
-    await fs.rename(t.tmp, t.target);
-    cache.delete(t.name);
-  }
-}
-
-/** Atomically replace a whole file with raw text (used by restore/import). Caller must hold the lock. */
-export async function replaceFileRaw(name: TableName, text: string) {
-  const target = tablePath(name);
-  const tmp = await writeTemp(target, text);
-  await fs.rename(tmp, target);
-  cache.delete(name);
+/** Replace whole files with raw CSV text (restore/import). Caller must hold the lock. */
+export async function replaceFilesRaw(files: Map<TableName, string>) {
+  await storage().writeMany([...files].map(([name, text]) => ({ key: tableKey(name), text })));
+  for (const name of files.keys()) cache.delete(name);
 }
 
 export function invalidateCache() {

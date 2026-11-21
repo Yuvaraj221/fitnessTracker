@@ -2,12 +2,11 @@
 // columns / settings to existing files. Existing rows are never discarded:
 // any file that needs changing is backed up first.
 
-import { promises as fs } from 'node:fs';
 import { DEFAULT_RULES, DEFAULT_SETTINGS } from '@forge/shared';
-import { BACKUP_DIR, DATA_DIR } from '../config';
 import { createBackup } from '../services/backup';
-import { TABLE_LIST, TABLES, type TableName } from './schema';
-import { parseCsv, serializeCsv, tablePath, type Row } from './store';
+import { storage } from '../storage';
+import { TABLE_LIST, type TableName } from './schema';
+import { invalidateCache, parseCsv, serializeCsv, tableKey, type Row } from './store';
 
 function defaultRows(name: TableName): Row[] {
   if (name === 'achievement_rules') return DEFAULT_RULES.map((r) => ({ ...r }));
@@ -17,14 +16,10 @@ function defaultRows(name: TableName): Row[] {
   return [];
 }
 
-export async function initDataFiles(log = console.log) {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.mkdir(BACKUP_DIR, { recursive: true });
-
-  // Remove temp files left behind by an interrupted write.
-  for (const f of await fs.readdir(DATA_DIR)) {
-    if (f.endsWith('.tmp')) await fs.rm(`${DATA_DIR}/${f}`, { force: true });
-  }
+/** Returns `created: true` when every file was missing (a brand-new store). */
+export async function initDataFiles(log = console.log): Promise<{ created: boolean }> {
+  const store = storage();
+  await store.prepare?.();
 
   let backedUp = false;
   const backupOnce = async () => {
@@ -32,27 +27,25 @@ export async function initDataFiles(log = console.log) {
     backedUp = true;
   };
 
+  let missingCount = 0;
   for (const t of TABLE_LIST) {
-    const file = tablePath(t.name);
-    let text: string | null = null;
-    try {
-      text = await fs.readFile(file, 'utf8');
-    } catch {
-      /* missing */
-    }
+    const key = tableKey(t.name);
+    const res = await store.read(key);
+    const text = res && !res.notModified ? res.text : null;
 
     if (text === null) {
-      await fs.writeFile(file, serializeCsv(Object.keys(t.columns), defaultRows(t.name)));
+      missingCount += 1;
+      await store.writeMany([{ key, text: serializeCsv(Object.keys(t.columns), defaultRows(t.name)), createOnly: true }]);
       log(`  created ${t.file}`);
       continue;
     }
 
-    const headerLine = text.replace(/^﻿/, '').split(/\r?\n/, 1)[0] ?? '';
+    const headerLine = text.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0] ?? '';
     const present = headerLine.split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
     const missing = Object.keys(t.columns).filter((c) => !present.includes(c));
-    let { columns, rows } = parseCsv(t.name, text);
-    let changed = missing.length > 0 && headerLine.trim() !== '';
-    if (headerLine.trim() === '') changed = true; // empty file: write the header
+    const parsed = parseCsv(t.name, text);
+    let rows = parsed.rows;
+    let changed = missing.length > 0 || headerLine.trim() === '';
 
     if (t.name === 'user_settings') {
       const keys = new Set(rows.map((r) => String(r.setting_key)));
@@ -65,9 +58,10 @@ export async function initDataFiles(log = console.log) {
 
     if (changed) {
       if (rows.length) await backupOnce();
-      await fs.writeFile(file, serializeCsv(columns, rows));
+      await store.writeMany([{ key, text: serializeCsv(parsed.columns, rows), ifMatch: res!.version }]);
       log(`  upgraded ${t.file}${missing.length ? ` (added columns: ${missing.join(', ')})` : ''}`);
     }
   }
-  return TABLES;
+  invalidateCache();
+  return { created: missingCount === TABLE_LIST.length };
 }

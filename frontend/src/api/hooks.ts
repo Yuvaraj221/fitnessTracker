@@ -10,7 +10,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useToast } from '../components/ui/Toast';
-import { api } from './client';
+import { api, type HealthInfo } from './client';
 import type { AchievementOverview, BackupManifest, DataInfo } from './types';
 
 export const keys = {
@@ -29,6 +29,7 @@ export const useBodyMetrics = () => useQuery({ queryKey: keys.body, queryFn: () 
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: () => api.get<Settings>('/settings') });
 export const useAchievements = () => useQuery({ queryKey: keys.achievements, queryFn: () => api.get<AchievementOverview>('/achievements') });
 export const useBackups = () => useQuery({ queryKey: keys.backups, queryFn: () => api.get<BackupManifest[]>('/data/backups') });
+export const useHealth = () => useQuery({ queryKey: ['health'], queryFn: () => api.get<HealthInfo>('/health'), staleTime: Infinity });
 export const useDataInfo = () => useQuery({ queryKey: keys.info, queryFn: () => api.get<DataInfo>('/data/info') });
 
 /** All CSV-backed data as one memoised Dataset for analytics. */

@@ -1,4 +1,5 @@
 import type { MutationResult, UnlockedAchievement } from '@forge/shared';
+import { getAccessKey, UNAUTHORIZED_EVENT } from '../lib/accessKey';
 
 export class ApiError extends Error {
   constructor(
@@ -17,15 +18,25 @@ async function parse(res: Response) {
   } catch {
     /* not JSON */
   }
+  if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   if (!res.ok) {
     const message =
       json?.error?.message ??
       (res.status >= 500 || res.status === 0
-        ? 'FORGE couldn’t reach its local server. Check that `npm run dev` is still running, then try again.'
+        ? SERVER_UNREACHABLE
         : `The request failed (${res.status}).`);
     throw new ApiError(message, res.status);
   }
   return json;
+}
+
+const SERVER_UNREACHABLE = import.meta.env.DEV
+  ? 'FORGE couldn’t reach its local server. Check that `npm run dev` is still running, then try again.'
+  : 'FORGE couldn’t reach its server. Check your connection and try again.';
+
+export function authHeaders(): Record<string, string> {
+  const key = getAccessKey();
+  return key ? { Authorization: `Bearer ${key}` } : {};
 }
 
 async function request(method: string, url: string, body?: unknown, raw?: BodyInit) {
@@ -33,13 +44,40 @@ async function request(method: string, url: string, body?: unknown, raw?: BodyIn
   try {
     res = await fetch(`/api${url}`, {
       method,
-      headers: raw ? { 'Content-Type': 'application/zip' } : body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      headers: {
+        ...authHeaders(),
+        ...(raw ? { 'Content-Type': 'application/zip' } : body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
       body: raw ?? (body !== undefined ? JSON.stringify(body) : undefined),
     });
   } catch {
-    throw new ApiError('FORGE couldn’t reach its local server. Check that `npm run dev` is still running, then try again.', 0);
+    throw new ApiError(SERVER_UNREACHABLE, 0);
   }
   return parse(res);
+}
+
+/** Downloads a file from the API (with the access key) and saves it in the browser. */
+export async function download(url: string, fallbackName: string) {
+  let res: Response;
+  try {
+    res = await fetch(`/api${url}`, { headers: authHeaders() });
+  } catch {
+    throw new ApiError(SERVER_UNREACHABLE, 0);
+  }
+  if (!res.ok) await parse(res);
+  const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? fallbackName;
+  const href = URL.createObjectURL(await res.blob());
+  const a = Object.assign(document.createElement('a'), { href, download: name });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
+
+export interface HealthInfo {
+  ok: boolean;
+  storage: { kind: 'filesystem' | 'vercel-blob'; persistent: boolean };
+  accessKeyRequired: boolean;
 }
 
 export const api = {

@@ -1,26 +1,32 @@
+import { lazy, Suspense, type ReactNode } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
-import { AchievementsPage } from './pages/Achievements';
-import { AnalyticsPage } from './pages/Analytics';
-import { BodyMetricsPage } from './pages/BodyMetrics';
-import { DashboardPage } from './pages/Dashboard';
-import { NotFoundPage } from './pages/NotFound';
-import { NutritionPage } from './pages/Nutrition';
-import { SettingsPage } from './pages/Settings';
-import { WorkoutsPage } from './pages/Workouts';
+import { PageSkeleton } from './components/ui/primitives';
+
+// Each page is its own chunk so the first load stays small.
+const DashboardPage = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.DashboardPage })));
+const WorkoutsPage = lazy(() => import('./pages/Workouts').then((m) => ({ default: m.WorkoutsPage })));
+const NutritionPage = lazy(() => import('./pages/Nutrition').then((m) => ({ default: m.NutritionPage })));
+const BodyMetricsPage = lazy(() => import('./pages/BodyMetrics').then((m) => ({ default: m.BodyMetricsPage })));
+const AnalyticsPage = lazy(() => import('./pages/Analytics').then((m) => ({ default: m.AnalyticsPage })));
+const AchievementsPage = lazy(() => import('./pages/Achievements').then((m) => ({ default: m.AchievementsPage })));
+const SettingsPage = lazy(() => import('./pages/Settings').then((m) => ({ default: m.SettingsPage })));
+const NotFoundPage = lazy(() => import('./pages/NotFound').then((m) => ({ default: m.NotFoundPage })));
+
+const page = (el: ReactNode) => <Suspense fallback={<PageSkeleton />}>{el}</Suspense>;
 
 export function App() {
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route index element={<DashboardPage />} />
-        <Route path="workouts" element={<WorkoutsPage />} />
-        <Route path="nutrition" element={<NutritionPage />} />
-        <Route path="body" element={<BodyMetricsPage />} />
-        <Route path="analytics" element={<AnalyticsPage />} />
-        <Route path="achievements" element={<AchievementsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="*" element={<NotFoundPage />} />
+        <Route index element={page(<DashboardPage />)} />
+        <Route path="workouts" element={page(<WorkoutsPage />)} />
+        <Route path="nutrition" element={page(<NutritionPage />)} />
+        <Route path="body" element={page(<BodyMetricsPage />)} />
+        <Route path="analytics" element={page(<AnalyticsPage />)} />
+        <Route path="achievements" element={page(<AchievementsPage />)} />
+        <Route path="settings" element={page(<SettingsPage />)} />
+        <Route path="*" element={page(<NotFoundPage />)} />
       </Route>
     </Routes>
   );

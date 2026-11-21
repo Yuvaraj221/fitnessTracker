@@ -22,7 +22,7 @@ export interface BackupManifest {
 
 export interface DataInfo {
   dataDir: string;
-  backupDir: string;
+  storage: { kind: 'filesystem' | 'vercel-blob'; persistent: boolean };
   tables: { name: string; file: string; rows: number }[];
   sampleRows: number;
 }

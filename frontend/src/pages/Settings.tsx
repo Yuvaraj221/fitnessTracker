@@ -1,11 +1,12 @@
 import { currentWeight, type Settings } from '@forge/shared';
 import { Archive, Database, Download, FileSpreadsheet, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { api } from '../api/client';
+import { api, download } from '../api/client';
 import { keys, useBackups, useBodyMetrics, useDataInfo, useForgeMutation, useSettings } from '../api/hooks';
 import type { BackupManifest } from '../api/types';
 import { Field, Input, NumberInput, numStr, parseNum, Toggle } from '../components/ui/form';
 import { ConfirmDialog } from '../components/ui/overlay';
+import { useToast } from '../components/ui/Toast';
 import { Badge, Button, Card, ErrorState, IconButton, PageHeader, PageSkeleton, Segmented } from '../components/ui/primitives';
 import { fmtNum } from '../lib/format';
 import { makeUnits } from '../lib/units';
@@ -248,6 +249,18 @@ function DataSection() {
   });
 
   const recent = useMemo(() => (backups ?? []).slice(0, 8), [backups]);
+  const toast = useToast();
+  const [exporting, setExporting] = useState(false);
+  const run = async (fn: () => Promise<void>, spinner = true) => {
+    if (spinner) setExporting(true);
+    try {
+      await fn();
+    } catch (err) {
+      toast.error('Download failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      if (spinner) setExporting(false);
+    }
+  };
 
   return (
     <div className="mt-8 space-y-4">
@@ -255,9 +268,16 @@ function DataSection() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card
           title="CSV files"
-          subtitle={info ? <span className="font-mono text-[12px] break-all">{info.dataDir}</span> : undefined}
+          subtitle={
+            info ? (
+              <span className="font-mono text-[12px] break-all">
+                {info.dataDir}
+                {!info.storage.persistent && <span className="ml-1 font-sans text-warn">· temporary</span>}
+              </span>
+            ) : undefined
+          }
           action={
-            <Button size="sm" icon={Download} onClick={() => (window.location.href = '/api/data/export')}>
+            <Button size="sm" icon={Download} loading={exporting} onClick={() => run(() => download('/data/export', 'forge-export.zip'))}>
               Export all (.zip)
             </Button>
           }
@@ -268,9 +288,7 @@ function DataSection() {
                 <FileSpreadsheet className="size-4 shrink-0 text-ink-3" aria-hidden />
                 <span className="flex-1 truncate font-mono text-[12px]">{t.file}</span>
                 <span className="text-ink-3 tabular">{fmtNum(t.rows)} rows</span>
-                <a href={`/api/data/export/${t.name}`} className="rounded-md p-1.5 text-ink-3 hover:bg-raised hover:text-ink" aria-label={`Download ${t.file}`} title={`Download ${t.file}`}>
-                  <Download className="size-3.5" />
-                </a>
+                <IconButton size="sm" icon={Download} label={`Download ${t.file}`} onClick={() => run(() => download(`/data/export/${t.name}`, t.file), false)} />
               </li>
             ))}
           </ul>

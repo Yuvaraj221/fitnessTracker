@@ -34,12 +34,17 @@ This document covers the six pre-implementation deliverables: architecture, fold
 4. The achievement engine re-evaluates rules against the fresh data and appends new unlocks to `achievements.csv`.
 5. The API responds `{ data, unlocked }`. The client invalidates affected queries, so dashboards and charts recompute, and shows toasts for successes and newly unlocked achievements.
 
+**Storage drivers.** Only the storage layer (`backend/src/storage/`) touches bytes.
+- `FilesystemDriver` stores `data/*.csv` and `backups/` on disk. It is used locally, and on Vercel without Blob, where it points at `/tmp` and is flagged as temporary.
+- `BlobDriver` stores the same files in Vercel Blob. It is chosen automatically when `BLOB_READ_WRITE_TOKEN` is set. Writes are conditional on each file's ETag, so two serverless instances can never silently overwrite each other; a lost race returns HTTP 409 and nothing is written.
+- On Vercel, `api/index.mjs` wraps the bundled Express app (`backend/dist/vercel.mjs`). Each instance initialises lazily on its first request.
+
 **Key decisions**
 
 | Decision | Why |
 |---|---|
-| Backend owns all file I/O | The browser can't, and shouldn't, write project files. One module (`backend/src/csv/store.ts`) is the only code that touches `data/`. |
-| One global write lock | A single user writes rarely; serialising every write removes all interleaving and cross-file consistency risk at negligible cost. |
+| Backend owns all file I/O | The browser can't, and shouldn't, write project files. `backend/src/csv/store.ts` is the only code that reads or writes tables, through a pluggable storage driver. |
+| One global write lock (+ ETags on Vercel) | A single user writes rarely; serialising writes in-process removes interleaving. Across serverless instances, ETag-conditional writes stop lost updates. |
 | Read from disk on every request (mtime-cached) | Nothing depends on in-memory state, and hand edits to a CSV are picked up without a restart. |
 | Unknown CSV columns are preserved | If you add your own column in a spreadsheet, FORGE keeps it on every write. |
 | `shared/` package for analytics | The dashboard (client) and the achievement engine (server) compute PRs, streaks and volume with the *same* code, so numbers never disagree. |
@@ -50,7 +55,7 @@ This document covers the six pre-implementation deliverables: architecture, fold
 
 | Method & path | Purpose |
 |---|---|
-| `GET /api/health` | Liveness + data directory |
+| `GET /api/health` | Liveness, storage mode and whether an access key is required (public) |
 | `GET/POST /api/workouts`, `GET/PUT/DELETE /api/workouts/:id` | Workouts with nested exercises → sets |
 | `GET/POST /api/meals`, `PUT/DELETE /api/meals/:id` | Food entries (`?from=&to=` filter) |
 | `GET/POST /api/body-metrics`, `PUT/DELETE /api/body-metrics/:id` | Body measurements |
@@ -70,6 +75,8 @@ This document covers the six pre-implementation deliverables: architecture, fold
 ```
 forge/
 ├── package.json              npm workspaces + `npm run dev` (runs API + web together)
+├── vercel.json               Vercel build, rewrites and function settings
+├── api/index.mjs             Vercel serverless entry → bundled Express app
 ├── README.md
 ├── docs/ARCHITECTURE.md      this file
 ├── data/                     ★ source of truth — committed with headers + sample rows
@@ -89,7 +96,9 @@ forge/
 │   │   ├── server.ts         startup: init files → evaluate achievements → listen
 │   │   ├── app.ts            express app, routes, error handler
 │   │   ├── config.ts         paths/ports (env overridable)
-│   │   ├── csv/              schema.ts · store.ts (atomic I/O) · init.ts (create/upgrade files)
+│   │   ├── vercel.ts         serverless entry (bundled by esbuild)
+│   │   ├── storage/          filesystem + Vercel Blob drivers
+│   │   ├── csv/              schema.ts · store.ts (transactions) · init.ts (create/upgrade files)
 │   │   ├── routes/           workouts · crud (meals, body metrics) · settings · achievements · data
 │   │   ├── services/         repo (joins) · achievements · backup · sample
 │   │   └── lib/              validation (zod) · errors · ids · respond

@@ -1,7 +1,7 @@
-import { Bell, Menu, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
+import { AlertTriangle, Bell, Menu, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useAchievements, useSettings, useToday } from '../../api/hooks';
+import { useAchievements, useHealth, useSettings, useToday } from '../../api/hooks';
 import { cn } from '../../lib/cn';
 import { fmtDateLong, fmtDateMedium } from '../../lib/format';
 import { LogoMark } from './Logo';
@@ -68,6 +68,7 @@ export function AppShell() {
   const today = useToday();
   const { data: settings } = useSettings();
   const { data: ach } = useAchievements();
+  const { data: health } = useHealth();
   const location = useLocation();
 
   useEffect(() => setMobileOpen(false), [location.pathname]);
@@ -183,6 +184,16 @@ export function AppShell() {
             {initials}
           </Link>
         </header>
+
+        {health && !health.storage.persistent && (
+          <div role="status" className="flex items-start gap-2 border-b border-warn/30 bg-warn/10 px-4 py-2 text-[13px] text-ink-2 sm:px-6">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
+            <p>
+              <span className="font-medium text-ink">Temporary storage.</span> This deployment has no Vercel Blob store connected, so changes can disappear when the server restarts.
+              Connect a Blob store in your Vercel project to keep your data.
+            </p>
+          </div>
+        )}
 
         <main className="mx-auto w-full min-w-0 max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8">
           <Outlet />

@@ -1,0 +1,29 @@
+{
+  "name": "forge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FORGE — Build. Track. Evolve. A local-first fitness tracker backed by CSV files.",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c \"#ff6b1f,#3b9eff\" \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev -w @forge/backend",
+    "dev:web": "npm run dev -w @forge/frontend",
+    "build": "npm run build -w @forge/frontend",
+    "start": "concurrently -k -n api,web \"npm run start -w @forge/backend\" \"npm run preview -w @forge/frontend\"",
+    "typecheck": "npm run typecheck -w @forge/backend && npm run typecheck -w @forge/frontend",
+    "test": "npm run test -w @forge/backend",
+    "sample:load": "npm run sample:load -w @forge/backend",
+    "sample:remove": "npm run sample:remove -w @forge/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.7"
+  },
+  "engines": {
+    "node": ">=20.11"
+  }
+}

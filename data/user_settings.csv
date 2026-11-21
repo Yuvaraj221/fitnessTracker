@@ -1,0 +1,15 @@
+setting_key,setting_value
+display_name,Athlete
+starting_weight_kg,
+target_weight_kg,78
+calorie_target,2400
+protein_target_g,150
+carbs_target_g,260
+fat_target_g,75
+weekly_workout_target,4
+weight_unit,kg
+length_unit,cm
+achievement_notifications,true
+show_locked_achievements,true
+active_title,
+achievements_seen_count,0

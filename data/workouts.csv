@@ -1,0 +1,13 @@
+workout_id,date,workout_name,muscle_group,duration_minutes,notes,created_at
+sample_wo_01,2026-11-01,Push Day,Chest|Shoulders|Triceps,63,[Sample] Demo workout — remove from Settings → Data.,2026-11-01T18:10:00.000Z
+sample_wo_02,2026-11-02,Back & Biceps,Back|Biceps,55,[Sample] Demo workout — remove from Settings → Data.,2026-11-02T18:11:00.000Z
+sample_wo_03,2026-11-04,Leg Day,Quads|Hamstrings|Glutes,70,[Sample] Demo workout — remove from Settings → Data.,2026-11-04T18:12:00.000Z
+sample_wo_04,2026-11-06,Upper Body,Chest|Back|Shoulders,55,[Sample] Demo workout — remove from Settings → Data.,2026-11-06T18:13:00.000Z
+sample_wo_05,2026-11-08,Push Day,Chest|Shoulders|Triceps,62,[Sample] Demo workout — remove from Settings → Data.,2026-11-08T18:14:00.000Z
+sample_wo_06,2026-11-09,Back & Biceps,Back|Biceps,59,[Sample] Demo workout — remove from Settings → Data.,2026-11-09T18:15:00.000Z
+sample_wo_07,2026-11-11,Leg Day,Quads|Hamstrings|Glutes,71,[Sample] Demo workout — remove from Settings → Data.,2026-11-11T18:16:00.000Z
+sample_wo_08,2026-11-13,Upper Body,Chest|Back|Shoulders,56,[Sample] Demo workout — remove from Settings → Data.,2026-11-13T18:17:00.000Z
+sample_wo_09,2026-11-15,Push Day,Chest|Shoulders|Triceps,58,[Sample] Demo workout — remove from Settings → Data.,2026-11-15T18:18:00.000Z
+sample_wo_10,2026-11-16,Back & Biceps,Back|Biceps,59,[Sample] Demo workout — remove from Settings → Data.,2026-11-16T18:19:00.000Z
+sample_wo_11,2026-11-18,Leg Day,Quads|Hamstrings|Glutes,67,[Sample] Demo workout — remove from Settings → Data.,2026-11-18T18:20:00.000Z
+sample_wo_12,2026-11-20,Upper Body,Chest|Back|Shoulders,52,[Sample] Demo workout — remove from Settings → Data.,2026-11-20T18:21:00.000Z

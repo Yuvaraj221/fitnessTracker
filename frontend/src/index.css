@@ -1,0 +1,115 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------
+   FORGE design tokens. Dark by default: charcoal surfaces, orange as the
+   primary accent, electric blue secondary, emerald for positive signals.
+   ------------------------------------------------------------------ */
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-bg: #0b0b0d;
+  --color-surface: #131316;
+  --color-raised: #1a1a1f;
+  --color-overlay: #202026;
+  --color-line: #25252b;
+  --color-line-strong: #33333b;
+
+  --color-ink: #ededf0;
+  --color-ink-2: #a3a3ad;
+  --color-ink-3: #72727c;
+
+  --color-brand: #ff6b1f;
+  --color-brand-hover: #ff8040;
+  --color-brand-soft: #ff6b1f1f;
+  --color-electric: #3b9eff;
+  --color-electric-soft: #3b9eff1f;
+  --color-good: #10b981;
+  --color-good-soft: #10b9811f;
+  --color-warn: #f5a524;
+  --color-bad: #ef4444;
+  --color-bad-soft: #ef44441f;
+
+  /* Chart series — validated for CVD separation on the dark surface. */
+  --color-series-calories: #e2620f;
+  --color-series-protein: #3987e5;
+  --color-series-carbs: #e2620f;
+  --color-series-fats: #199e70;
+  --color-chart-grid: #222228;
+
+  --radius-card: 14px;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background: var(--color-bg);
+  }
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-electric);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+  input[type='date']::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+  }
+  ::selection {
+    background: #ff6b1f55;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #33333b transparent;
+  }
+}
+
+@keyframes forge-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes forge-slide-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes forge-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+}
+.animate-fade-in { animation: forge-fade-in 180ms var(--ease-out) both; }
+.animate-slide-in { animation: forge-slide-in 220ms var(--ease-out) both; }
+.animate-skeleton { animation: forge-pulse 1.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Recharts focus outline on SVG wrappers is noisy; keep keyboard focus elsewhere. */
+.recharts-wrapper svg:focus,
+.recharts-surface:focus { outline: none; }
